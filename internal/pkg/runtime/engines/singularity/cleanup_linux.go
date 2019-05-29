@@ -7,6 +7,7 @@ package singularity
 
 import (
 	"os"
+	"os/exec"
 	"syscall"
 
 	"github.com/sylabs/singularity/internal/pkg/instance"
@@ -49,6 +50,44 @@ func (engine *EngineOperations) CleanupContainer(fatal error, status syscall.Wai
 			return err
 		}
 		return file.Delete()
+	}
+
+	if engine.EngineConfig.CryptMount != "" {
+		// Elevate the privilege to unmount and delete the crypt device
+		uid := os.Getuid()
+		err := syscall.Setresuid(uid, 0, uid)
+		if err != nil {
+			sylog.Debugf("Err setting suid")
+			return err
+		}
+
+		err = syscall.Unmount("/usr/local/var/singularity/mnt/session/final", syscall.MNT_DETACH)
+		if err != nil {
+			syscall.Setresuid(uid, uid, 0)
+			sylog.Debugf("Error while unmounting overlay FS: %s", err)
+			return err
+		}
+
+		err = syscall.Unmount("/usr/local/var/singularity/mnt/session/rootfs", syscall.MNT_DETACH)
+		if err != nil {
+			syscall.Setresuid(uid, uid, 0)
+			sylog.Debugf("Error while unmounting Rootfs: %s", err)
+			return err
+		}
+
+		cmd := exec.Command("/sbin/cryptsetup", "luksClose", engine.EngineConfig.CryptMount)
+		cmd.Dir = "/dev/mapper"
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+		cmd.SysProcAttr.Credential = &syscall.Credential{Uid: 0, Gid: 0}
+		_, err = cmd.CombinedOutput()
+		if err != nil {
+			sylog.Debugf("Unable to delete the crypt device %s", err)
+			syscall.Setresuid(uid, uid, 0)
+			return err
+		}
+
+		// Restore the privilege
+		err = syscall.Setresuid(uid, uid, 0)
 	}
 
 	return nil

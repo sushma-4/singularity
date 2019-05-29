@@ -13,9 +13,10 @@ import (
 
 // EngineConfig stores both the JSONConfig and the FileConfig
 type EngineConfig struct {
-	JSON      *JSONConfig      `json:"jsonConfig"`
-	OciConfig *oci.Config      `json:"ociConfig"`
-	File      *FileConfig      `json:"-"`
-	Network   *network.Setup   `json:"-"`
-	Cgroups   *cgroups.Manager `json:"-"`
+	JSON       *JSONConfig      `json:"jsonConfig"`
+	OciConfig  *oci.Config      `json:"ociConfig"`
+	File       *FileConfig      `json:"-"`
+	Network    *network.Setup   `json:"-"`
+	Cgroups    *cgroups.Manager `json:"-"`
+	CryptMount string           `json:"_"`
 }
